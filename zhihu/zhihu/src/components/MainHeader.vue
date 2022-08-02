@@ -1,15 +1,13 @@
 <template>
   <header class="main-header">
-
+      header
   </header>
 </template>
 
 <script>
 export default {
   name: 'MainHeader',
-  props: {
-    msg: String
-  }
+
 }
 </script>
 
