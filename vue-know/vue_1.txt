@@ -1,0 +1,221 @@
+相对于 vue2，vue3在一些配置文件上做了极大的调整
+比如 main.js\router.js 等，在创建vue实例方面，有 构造函数的方式new Vue() 修改为 createApp （创建工厂）
+router也做了相应的调整：
+    无需引入 Vue；
+    引入 router的方式 为：
+        import {createRouter, createWebHistory} from 'vue-router'; // 引入vue-router
+
+全局引入
+    app.config.globalProperties.$axios = axios;
+
+main.js的代码：
+    import { createApp } from 'vue'
+    import App from './App.vue'
+    import router from './router';
+
+    const app = createApp(App);
+
+    app.use(router);
+    app.mount('#app')
+
+router.js的代码：
+    import {createRouter, createWebHistory} from 'vue-router'; // 引入vue-router
+    import Home from './views/Home';
+
+    export default createRouter({
+        history: createWebHistory(process.env.BASE_URL),
+        routes : [
+            {
+                path:'/',
+                name:'Home',
+                component : Home
+            },
+
+            {
+                path:'/about',
+                name:'about',
+                component: () => import('./views/About')
+            }
+        ]
+    })
+
+组合式API：一种低侵入式的，函数式的API，使得我们能够更灵活方便的组合组件逻辑，同时能够将同一个逻辑关注点相关代码收集在一起，这样当我们再去查找某个逻辑时就不用再滚动条拉来拉去了
+
+vue3 提供了一个新的选项：setup
+    在setup选项中我们可以定义响应式数据属性，注册组件的生命周期函数，定义计算属性，监听属性等等，也就是说大部分代码我们都可以写在setup选项中，最后再将这些响应式的数据通过return的形式暴露给外部或者模板使用。
+
+    setup是一个接收2个参数的函数props和context
+        props：props是setup的第一个参数，该参数是响应式的，因此不能用ES6进行解构，因为会消除它的响应式
+        context：context是setup的第二个参数，context是JavaScript中的一个普通对象，它不是响应式的可以放心的使用ES6结构。context对外暴露了一些可能会用到的值，比如：attrs、slots、emit、expose等
+
+    setup函数中不能使用this，因为这里this并不会找到vue的实例
+
+    所有的数据属性，计算属性，方法，生命周期钩子函数等都可以直接定义在setup函数中
+
+    如果想要在组件的其余部分（如计算属性，方法，生命周期钩子函数等）或者组件模板中使用setup中的数据，则需要通过return的形式把被使用的数据暴露出去
+
+    setup中无法获取data()，methods和computed中的成员，因为setup的调用是发生在这些属性被解析之前的
+
+    setup是围绕beforeCreate和created生命周期钩子运行的，因此在3.0中移除了这两个钩子函数，而原本应该写在这两个函数中的代码也都可以直接写在setup函数中
+
+    在setup函数中定义的数据属性默认都不是响应式的，如果想要声明响应式的数据属性则需借助ref或者reactive两个函数来实现
+
+    下面看下使用了setup后的vue代码：
+        import { ref } from 'vue'
+
+        export default{
+        	components:{},
+        	props:{title},
+        	setup(props,context){
+        		let message = ref('hello world')//定义一个响应式的变量
+        		const getTitle = ()=>{ console.log('title')}//定义一个普通函数
+        		onMounted(getTitle);//调用生命周期函数
+        		//所有需要给模板或其它钩子函数使用的都需要在这里暴露出去
+        		return {
+        			message,
+        			getTitle
+        		}
+        	}
+        }
+
+    ref
+        上面说到在setup中声明的变量默认都不是响应式的，而我们知道vue最大特点就是响应式的数据驱动，如果升级了vue3就没了响应式这显然是不合理的。于是在vue3中就为我们提供了两个方法ref和reactive可以让数据变为响应式，我们先来看ref。
+
+        ref是一个函数使用前需要在vue中导入
+        ref可接收一个参数作为变量的默认值
+        ref的返回值是一个响应式的带有value属性的对象，然后可以通过该value属性访问或者修改响应式变量的值
+        用ref定义的变量，如果在模板中使用则可以直接使用变量名，如果是在JavaScript中使用则需要通过 【变量名.value】 的形式进行访问或修改
+
+    reactive
+        上面我们学到通过ref函数可以创建一个响应式的变量。不知有没有小伙伴发现，通过ref创建的变量除了访问和修改都需要通过点value的形式外，还有一点就是ref一次只能创建一个响应式变量，那么问题来了一个组件不可能只有一个或者几个变量。如果都用ref来创建那也太麻烦了。诶，别急，vue大佬们早就想到这一点了，于是又给我们提供了一个非常哇塞的方法-reactive，有了这个哇塞的方法后，我们就可以想定义多少就定义多少了，而且访问和修改也不需要通过点value的形式了。下面我们就看看这个哇塞的方法是怎么使用的吧。
+
+        import { reactive } from 'vue'
+        export default {
+            setup(){
+                const state = reactive({
+                    name:'',
+                    title:'',
+                    message:''
+                })
+
+                return {
+                    ...toRefs(state)
+                }
+            }
+        }
+        上面代码我们定义了一个响应式对象state，然后再将该对象的所有属性暴露出去。注意这里用到了另外一个方法toRefs，目的是为了在解构state时不会失去响应式。
+
+
+$的作用是区分用户定义的属性和原生暴露的属性
+
+mounted
+    这一步已经挂载好了，$el 也可以使用，可以开始第一个业务逻辑。这里并没有挂载所有的子组件，如果需要整个视图都渲染完毕，可以使用 vm.$nextTick
+
+组件注册分全局注册和局部注册
+    全局注册是在 创建实例时注册的，并且无需引入
+    局部注册是在 编写页面的时候当前页面引入组件的常用方法。
+
+
+组件通信
+    1. 父组件给子组件传递信息
+        这是比较常见的一种请情况，如父组件是一个列表，给子组件（列表）中的每个元素的传值
+        props 可以在组件上注册一些新的特性，当使用 props 给组件传值的时候，这个值就成为这个组件的一个属性，
+            Vue.component('ListItem',{
+                props : ['title'],
+                template: '<h3>{{ title }}</h3>'
+            })
+
+        在子组件中，使用 props 属性类接收传递过来的值，可以直接调用，如同在data 中声明的数据一样。
+        当然，在组件中，可以有无数个 props 属性，而且任何值都可以传递过去
+            <ListItem title="Test Title One"></ListItem>
+            <ListItem title="Test Title two"></ListItem>
+            <ListItem title="Test Title Three"></ListItem>
+
+        直接绑定接收数据的 key ，这里的 key 是 title ， 接收的时候也是 title，整合起来好了：
+            <div id="list">
+                <ListItem v-for="item in lists" :title="item.title" :key="item.index"></ListItem>
+            </div>
+
+            import ListItem from './ListItem'
+
+            new Vue({
+                el:'#list',
+                data () {
+
+                    return {
+
+                        lists : {
+                            {id: 1, title:'Test Title One'},
+                            {id: 1, title:'Test Title Two'},
+                            {id: 1, title:'Test Title Three'}
+                        }
+                    }
+                },
+                components : {
+                    ListItem
+                }
+            })
+
+        关于 props ，需要注意其命名方式。因为在HTML中，属性名对于大小写是不敏感的，所有浏览器会自动把属性名中的大写字母转化为小写。这意味着若想要使用驼峰命名发来给 属性命名，在传递时需要 使用 短横线 分隔命名
+
+            <ListItem item-title="Test Title One"></ListItem>
+            <ListItem item-title="Test Title two"></ListItem>
+            <ListItem item-title="Test Title Three"></ListItem>
+            Vue.component('ListItem',{
+                props : ['itemTitle'],
+                template: '<h3>{{ title }}</h3>'
+            })
+
+        从上述代码可以看出props命名的转换，props 可以有很多类型，数字、变量、数组或者对象都可以
+            <div id="list">
+                <ListItem
+                    :number="6666"
+                    :boolean="false"
+                    :variable="variable"
+                    :array="array"
+                    :object="object"
+                >
+
+                </ListItem>
+            </div>
+
+            import ListItem from './ListItem'
+
+            new Vue({
+                el:'#list',
+                data () {
+
+                    return {
+
+                        variable:'variable',
+                        array:[1,2,3],
+                        object:{
+                            key:1,
+                            content:'content'
+                        }
+                    }
+                },
+                components : {
+                    ListItem
+                }
+            })
+
+        props 的数据传输是单向的，也就是说，父组件给子组件传值，子组件只能调用，不能修改。若在子组件中强行修改 props 数据，Vue会在控制台给出警告。
+        若项目中必须修改，可以使用以下两种方式：
+            // 例1 - 在组建内部定义数据
+            props:['title'],
+            data() {
+                return {
+                    local_title:this.title
+                }
+            }
+
+            // 例2 - 使用计算属性
+            props:['title'],
+            computed: {
+                local_title:() => {
+                    local_title:this.title
+                }
+            }
+
+    2.子组件与父组件的通信
