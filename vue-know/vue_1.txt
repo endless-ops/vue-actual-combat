@@ -220,3 +220,253 @@ mounted
 
     2.子组件与父组件的通信
         子组件向父组件传值需要通过触发父组件定义的方法，之后父组件可以在方法中获取子组件传递过来的数据，使用 $emit 方法
+        $emit 是 Vue.js 实例自带方法，用来调用父组件传递过来的方法，调用是还可以指定参数传过去。
+
+        父组件：
+            <template>
+              <div>
+                <div class="input-part">
+                  <input type="text" v-model="words"/>
+                  <button v-on:click="insertItem"> 插入</button>
+                </div>
+                <ul>
+                  <li v-for="(item,index) of list" v-bind:key="index">
+                    <TodoListItem v-bind:item="item" v-bind:index="index" v-on:deleteItem="deleteItem" v-on:modifyItem="modifyItem"/>
+                  </li>
+                </ul>
+              </div>
+            </template>
+
+            <script>
+            import TodoListItem from '@/components/TodoListItem'
+            export default {
+              name: 'TodoList',
+              components: { TodoListItem },
+              data () {
+                return {
+                  words: '',
+                  list: []
+                }
+              },
+              methods: {
+                insertItem () {
+                  this.list.push(this.words)
+                },
+                deleteItem (index) {
+                  this.list.splice(index, 1)
+                },
+                modifyItem (newContent, index) {
+                  this.list.splice(index, 1, newContent)
+                }
+              }
+            }
+            </script>
+
+            <!-- Add "scoped" attribute to limit CSS to this component only -->
+            <style scoped>
+
+            </style>
+
+        子组件：
+            <template>
+              <div class="item">
+                <p>
+                  <span v-show="!isActive" v-on:click="activeItem">{{ item }}</span>
+                  <span v-show="!isActive">
+                    <input type="text" v-model="content" v-on:blur="inactiveItem"/>
+                  </span>
+                  <span v-on:click="$emit('deleteItem', index)">X</span>
+                </p>
+              </div>
+            </template>
+
+            <script>
+            export default {
+              name: 'TodoListItem',
+              props: ['item', 'index'],
+              data () {
+                return {
+                  content: '',
+                  isActive: false
+                }
+              },
+              methods: {
+                activeItem () {
+                  this.isActive = true
+                  this.content = this.item
+                },
+                inactiveItem () {
+                  this.$emit('modifyItem', this.content, this.index)
+                  this.isActive = false
+                }
+              }
+            }
+            </script>
+
+            <style scoped>
+
+            </style>
+
+    3. 子组件之间的通信
+        vue 并没有针对组件之间通信的方法，可以先将数据传递到父组件中，再通过父组件传递给 子组件。若觉得麻烦，可以使用Vue.js 推出的状态管理工具-Vuex
+
+        原理简单，就是 将变量的内容提到最高层级，之后可以在任意组件总调用，相当于JS中的全局变量
+
+
+插槽
+    插槽就是调用组件时放在组件标签中传递内容的，相应地组件内部需要有 <slot>标签来接收传递过来的内容，否则传递过来的任何内容都会被抛弃
+        // 父组件
+        <div id="list">
+            <ListItem
+                v-for="(item,index) in lists" :index="index" :key="item.id" :title="item.title">
+                Title-Content
+            </ListItem>
+        </div>
+
+        // 子组件
+        <div id="list-item">
+            <input type="text" v-model="title" />
+            <slot></slot>
+        </div>
+
+    在组件渲染的时候，<slot>标签会被渲染成 “Title-Content” ,若子组件内没有 <slot> 标签，则任何内容都不会被渲染。插槽内容可以是任何模板代码、组件或Html元素
+        // 父组件
+        <div id="list">
+            <ListItem
+                v-for="(item,index) in lists"
+                :index="index"
+                :key="item.id"
+                :title="item.title">
+                <p>Title-Content</p>
+                <OtherComponent></OtherComponent>
+            </ListItem>
+        </div>
+
+    插槽的功能固然强大，但有时会出现需要多个插槽的情况，此时可以给插槽命名，以区分不同的插槽
+        // 父组件
+        <div id="list">
+            <ListItem
+                v-for="(item,index) in lists"
+                :index="index"
+                :key="item.id"
+                :title="item.title">
+
+
+                <template slot="time">2018-11-11</template>
+                <template slot="author">rz</template>
+                <p class="shortCut">shortCut</p>
+                <p slot="shortCuts">shortCut</p>
+            </ListItem>
+        </div>
+
+        // 子组件
+        <div id="list-item">
+            <input type="text" v-model="title" />
+            <slot name="time"></slot>
+            <slot name="author"></slot>
+            <slot name="shortCut"></slot>
+            <slot name="shortCuts"></slot>
+        </div>
+
+    使用插槽固然很方便，但还需要注意作用域。在正常情况下，插槽的作用域是父组件的作用域，也就是说，其职能获取父组件内的变量
+    或函数。关于这一点，Vue.js 官方提供了一条准则------父组件模板的所有东西都会在父级作用域内编译；子组件模板的所有东西都
+    会在子级作用域内编译。
+
+    如果插槽需要使用子组件内部的数据，可以使用作用域插槽。脆弱看起来像是一个新的插槽，其实就是在组件内容处理插槽的时候，给
+    它绑定相应数据。
+        <div id="list">
+            <ListItem
+                v-for="(item,index) in lists"
+                :index="index"
+                :key="item.id"
+                :title="item.title">
+
+
+                <template slot-scope="list-item"> // 给插槽作用域命名为 list-item
+                    <span> 标题序号：{{ list-item.item.id }} </span> // 通过 list-item调用其内部内容
+                </template>
+            </ListItem>
+        </div>
+
+        // 子组件
+        <div id="list-item">
+            <slot :item="item">   // 将 item 对象作为插槽的props 传入
+                {{ item.id }}       // 给插槽回退内容
+            </slot>
+            <input type="text" v-model="title" />
+        </div>
+
+    从上述代码中可以看出，子组件在处理插槽的时候，及那个item对象绑定在插槽上，如同父组件给子组件传值一样，插槽内部就可以调用 item 的内容，之后返回给父组件中的插槽。
+    而父组件需要给当前插槽的作用起个名字，来证明当前插槽作用域的唯一性，之后即可通过这个名字来调用子组件内部的内容。
+
+    和插槽的name属性一样，slot-scope 属性也可以直接添加到 html 元素上。
+
+特殊情况
+    使用 $ref 来获取子组件中的内容
+        // 父组件
+        <div id="list">
+            <ListItem
+                v-for="(item,index) in lists"
+                :key="item.id"
+                ref="listItem">
+            </ListItem>
+        </div>
+        new Vue({
+            el:'#list',
+            methods : {
+                getChildComponentFunction() => {
+                    this.$refs.listItem.childComponentFunction()
+                }
+            }
+        })
+
+    看上去确实很方便，但是 $ref 还是有一定的限制。但是 $refs 是在组件渲染完成之后生效，
+    并非是响应式的。所以在模板或计算属性中，使用 $refs 是不可行的。
+
+    父组件可以通过 $refs 来访问子组件的内容，那么子组件没有简单的办法来访问到父组件的内容？可以使用 $parent 来获得父组件的内容
+    调用父组件的函数。
+        // 子组件
+        //JS
+        export default {
+
+            methods : {
+
+                this.$parent.parentComponentFunction();
+            }
+        }
+
+    子组件中可以调用父组件的函数，也可以调用父组件的变量，只是这样做可能会使项目的调试和理解变得更加困难
+
+    // 慎用 $ref 和 $parent
+    关于模板的操作，也有一些更加方便的方法，如内联模板。内联模板的本质是在父组件中直接创建子组件的模板，当元素增加 inline-template 属性之后，其内部不在被分发，
+    而是会被当作模板。在父组件中也可以直接调用。
+        // 父组件
+        <div id="list">
+            <ListItem
+                 inline-template>  // 在父组件中新建子组件模板
+                 <div>
+                    <p> ListItemComponent </p>
+                 </div>
+            </ListItem>
+        </div>
+
+        Vue.component('ListItem',{  // 注册子组件 组件
+            data() {            // 自定义组件数据
+                return {
+                    msg : '在子组件中声明数据'
+                }
+            },
+        })
+
+        new Vue({
+            el:'#list',
+
+            data() {            // 自定义组件数据
+                return {
+                    msg : '在父组件中声明数据'
+                }
+            },
+        })
+
+
+    v-once
